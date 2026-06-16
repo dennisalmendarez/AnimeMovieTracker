@@ -1,0 +1,338 @@
+@page "/movies"
+@rendermode InteractiveServer
+@using AnimeMovieTracker.Components.Models
+@using AnimeMovieTracker.Models
+@using AnimeMovieTracker.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager Navigation
+@inject MovieService MovieService
+@inject SavedMediaService SavedMediaService
+
+<PageTitle>Movies</PageTitle>
+
+<h1>Movies</h1>
+
+<PageActionBar>
+    <button class="filter-button" @onclick='() => ChangeCategory("popular")'>Popular</button>
+    <button class="filter-button" @onclick='() => ChangeCategory("top_rated")'>Top Rated</button>
+    <button class="random-button" @onclick="RandomMovie">🎲 Random Movie</button>
+</PageActionBar>
+
+<div class="search-row">
+    <input class="search-box" placeholder="Search all movies from TMDB..." @bind="searchText" @bind:event="oninput" />
+    <select class="search-box" @bind="selectedGenreId">
+        <option value="">All Genres</option>
+        @foreach (var genre in genres)
+        {
+            <option value="@genre.Id">@genre.Name</option>
+        }
+    </select>
+    <button class="filter-button" @onclick="SearchMovies">Search</button>
+    <button class="filter-button" @onclick="ClearSearch">Clear</button>
+</div>
+
+@if (isLoading)
+{
+    <p class="loader">Loading movies...</p>
+}
+else
+{
+    <p>Showing movies from TMDB. Page @currentPage</p>
+
+    <div class="media-grid">
+        @foreach (var movie in movies)
+        {
+            <div class="anime-info" @onclick="() => OpenMovieDetails(movie)">
+                <div class="card-header">
+                    <h3>@movie.Title</h3>
+                    <span class="favorite-icon" @onclick:stopPropagation="true" @onclick="() => ToggleFavorite(movie)">
+                        @(movie.IsFavorite ? "❤️" : "🤍")
+                    </span>
+                </div>
+
+                <img src="@movie.ImageUrl" alt="@movie.Title poster" />
+
+                <p>
+                    <strong>Score:</strong> @(movie.VoteAverage == 0 ? "N/A" : $"{movie.VoteAverage:0.0} / 10")<br />
+                    <strong>Release:</strong> @(string.IsNullOrWhiteSpace(movie.ReleaseDate) ? "N/A" : movie.ReleaseDate)
+                    @if (!string.IsNullOrWhiteSpace(movie.Status))
+                    {
+                        <br />
+                        <strong>Status:</strong>
+                        @movie.Status
+                    }
+                </p>
+
+                <div class="status-buttons" @onclick:stopPropagation="true">
+                    <button @onclick='() => SetStatus(movie, "Watching")'>Watching</button>
+                    <button @onclick='() => SetStatus(movie, "Want to Watch")'>Want to Watch</button>
+                    <button @onclick='() => SetStatus(movie, "Watched")'>Watched</button>
+                    <button @onclick='() => SetStatus(movie, "Dropped")'>Dropped</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="pagination">
+        <button @onclick="PreviousPage" disabled="@(currentPage == 1)">&lt;</button>
+
+        @foreach (var pageNumber in VisiblePages)
+        {
+            <button class="@(pageNumber == currentPage ? "active-page" : "")" @onclick="() => GoToPage(pageNumber)">
+                @pageNumber
+            </button>
+        }
+
+        <button @onclick="NextPage" disabled="@(currentPage >= totalPages)">&gt;</button>
+    </div>
+}
+
+@if (showModal && selectedMovie is not null)
+{
+    <div class="modal-overlay active" @onclick="CloseModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <button class="close-button" @onclick="CloseModal">×</button>
+
+            <h2>@selectedMovie.Title</h2>
+
+            <button class="favorite-btn-modal" @onclick="() => ToggleFavorite(selectedMovie)">
+                @(selectedMovie.IsFavorite ? "Remove from Favorites ❤️" : "Add to Favorites 🤍")
+            </button>
+
+            <img src="@selectedMovie.ImageUrl" alt="@selectedMovie.Title poster" class="modal-poster" />
+
+            <p><strong>Score:</strong> @(selectedMovie.VoteAverage == 0 ? "N/A" : $"{selectedMovie.VoteAverage:0.0} / 10")
+            </p>
+            <p><strong>Release:</strong> @(string.IsNullOrWhiteSpace(selectedMovie.ReleaseDate) ? "N/A" :
+                                                                                                                                                                                                                            selectedMovie.ReleaseDate)</p>
+                <p><strong>Status:</strong> @(string.IsNullOrWhiteSpace(selectedMovie.Status) ? "Not set" :
+                                                    selectedMovie.Status)</p>
+
+                    <div class="status-buttons">
+                        <button @onclick='() => SetStatus(selectedMovie, "Watching")'>Watching</button>
+                        <button @onclick='() => SetStatus(selectedMovie, "Want to Watch")'>Want to Watch</button>
+                        <button @onclick='() => SetStatus(selectedMovie, "Watched")'>Watched</button>
+                        <button @onclick='() => SetStatus(selectedMovie, "Dropped")'>Dropped</button>
+                    </div>
+
+                    <hr class="modal-clear" />
+
+                    <p class="synopsis">@selectedMovie.Overview</p>
+
+                    <h3>Cast</h3>
+
+                    @if (isLoadingCast)
+                    {
+                        <p>Loading cast...</p>
+                    }
+                    else if (cast.Count == 0)
+                    {
+                        <p class="no-results">Cast information is not available.</p>
+                    }
+                    else
+                    {
+                        <div class="characters-grid">
+                            @foreach (var actor in cast)
+                            {
+                                <div class="character-card">
+                                    <img src="@actor.ImageUrl" alt="@actor.Name" />
+                                    <p><strong>@actor.Name</strong></p>
+                                    <p class="va-name">@actor.Character</p>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+@code {
+    private List<TmdbGenre> genres = new();
+    private int? selectedGenreId = null;
+    private List<TmdbMovie> movies = new();
+    private List<TmdbCastMember> cast = new();
+
+    private string searchText = "";
+    private string currentCategory = "popular";
+
+    private bool isLoading = true;
+    private bool isLoadingCast = false;
+
+    private int currentPage = 1;
+    private int totalPages = 1;
+
+    private TmdbMovie? selectedMovie;
+    private bool showModal = false;
+
+    private IEnumerable<int> VisiblePages =>
+        Enumerable.Range(Math.Max(1, currentPage - 2), 6)
+            .Where(p => p <= totalPages);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("category", out var categoryValue))
+        {
+            currentCategory = categoryValue.ToString();
+        }
+
+        genres = await MovieService.GetMovieGenresAsync();
+        await LoadPage(1);
+    }
+
+    private async Task LoadPage(int page)
+    {
+        isLoading = true;
+
+        TmdbMoviePageResult result;
+
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            result = await MovieService.GetMoviesAsync(currentCategory, page, selectedGenreId);
+        }
+        else
+        {
+            result = await MovieService.SearchMoviesAsync(searchText, page, selectedGenreId);
+        }
+
+        movies = result.Items;
+        await ApplySavedStateToMovies();
+
+        currentPage = result.CurrentPage;
+        totalPages = result.TotalPages;
+
+        isLoading = false;
+    }
+
+
+    private async Task ApplySavedStateToMovies()
+    {
+        var savedItems = await SavedMediaService.GetMyItemsAsync();
+
+        foreach (var movie in movies)
+        {
+            ApplySavedStateToMovie(movie, savedItems);
+        }
+    }
+
+    private async Task ApplySavedStateToMovie(TmdbMovie movie)
+    {
+        var savedItems = await SavedMediaService.GetMyItemsAsync();
+        ApplySavedStateToMovie(movie, savedItems);
+    }
+
+    private static void ApplySavedStateToMovie(TmdbMovie movie, List<SavedMediaItem> savedItems)
+    {
+        var saved = savedItems.FirstOrDefault(x =>
+            x.MediaId == movie.Id &&
+            string.Equals(x.MediaType, "Movie", StringComparison.OrdinalIgnoreCase));
+
+        if (saved is null)
+            return;
+
+        movie.Status = saved.Status;
+        movie.IsFavorite = saved.IsFavorite;
+    }
+
+    private async Task SearchMovies()
+    {
+        currentPage = 1;
+        await LoadPage(1);
+    }
+
+    private async Task ClearSearch()
+    {
+        searchText = "";
+        selectedGenreId = null;
+        currentPage = 1;
+        await LoadPage(1);
+    }
+
+    private async Task ChangeCategory(string category)
+    {
+        currentCategory = category;
+        searchText = "";
+        currentPage = 1;
+        await LoadPage(1);
+    }
+
+    private async Task GoToPage(int page)
+    {
+        await LoadPage(page);
+    }
+
+    private async Task PreviousPage()
+    {
+        if (currentPage > 1)
+        {
+            await LoadPage(currentPage - 1);
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (currentPage < totalPages)
+        {
+            await LoadPage(currentPage + 1);
+        }
+    }
+
+    private async Task RandomMovie()
+    {
+        var randomMovie = await MovieService.GetRandomMovieAsync();
+
+        if (randomMovie is not null)
+        {
+            await ApplySavedStateToMovie(randomMovie);
+            await OpenMovieDetails(randomMovie);
+        }
+    }
+
+    private async Task OpenMovieDetails(TmdbMovie movie)
+    {
+        selectedMovie = movie;
+        showModal = true;
+
+        isLoadingCast = true;
+        cast = await MovieService.GetMovieCastAsync(movie.Id);
+        isLoadingCast = false;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedMovie = null;
+        cast.Clear();
+    }
+
+    private async Task ToggleFavorite(TmdbMovie movie)
+    {
+        movie.IsFavorite = !movie.IsFavorite;
+
+        await SavedMediaService.SaveOrUpdateItemAsync(
+            movie.Id,
+            "Movie",
+            movie.Title,
+            movie.ImageUrl,
+            movie.Status,
+            movie.IsFavorite
+        );
+    }
+
+    private async Task SetStatus(TmdbMovie movie, string status)
+    {
+        movie.Status = status;
+
+        await SavedMediaService.SaveOrUpdateItemAsync(
+            movie.Id,
+            "Movie",
+            movie.Title,
+            movie.ImageUrl,
+            movie.Status,
+            movie.IsFavorite
+        );
+    }
+}

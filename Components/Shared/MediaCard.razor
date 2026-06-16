@@ -1,0 +1,60 @@
+@using AnimeMovieTracker.Components.Models
+
+<div class="anime-info">
+    <div class="card-header">
+        <h3>@Item.Title</h3>
+
+        <span class="favorite-icon"
+              @onclick:stopPropagation="true"
+              @onclick="ToggleFavorite">
+            @(Item.IsFavorite ? "❤️" : "🤍")
+        </span>
+    </div>
+
+    <img src="@Item.ImageUrl" alt="@Item.Title cover" />
+
+    <p>
+        <strong>Score:</strong> @(Item.Rating == 0 ? "N/A" : $"{Item.Rating * 10:0} / 100")<br />
+        <strong>Genres:</strong> @Item.Genre<br />
+        <strong>Year:</strong> @(Item.Year == 0 ? "N/A" : Item.Year)<br />
+        <strong>Status:</strong> @(string.IsNullOrWhiteSpace(Item.Status) ? "Not set" : Item.Status)
+    </p>
+
+    <div class="status-buttons" @onclick:stopPropagation="true">
+        <button @onclick='() => SetStatus("Watching")'>Watching</button>
+        <button @onclick='() => SetStatus("Want to Watch")'>Want to Watch</button>
+        <button @onclick='() => SetStatus("Watched")'>Watched</button>
+        <button @onclick='() => SetStatus("Dropped")'>Dropped</button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public MediaItem Item { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<MediaItem> OnFavorite { get; set; }
+
+    [Parameter]
+    public EventCallback<(MediaItem item, string status)> OnStatus { get; set; }
+
+    private async Task SetStatus(string status)
+    {
+        Item.Status = status;
+
+        if (OnStatus.HasDelegate)
+        {
+            await OnStatus.InvokeAsync((Item, status));
+        }
+    }
+
+    private async Task ToggleFavorite()
+    {
+        Item.IsFavorite = !Item.IsFavorite;
+
+        if (OnFavorite.HasDelegate)
+        {
+            await OnFavorite.InvokeAsync(Item);
+        }
+    }
+}

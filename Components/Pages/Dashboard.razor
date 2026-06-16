@@ -1,0 +1,644 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.ComponentModel.DataAnnotations
+@using AnimeMovieTracker.Data
+@using AnimeMovieTracker.Models
+@using AnimeMovieTracker.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject SavedMediaService SavedMediaService
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>My Dashboard</h1>
+
+<section class="dashboard-hero">
+    <div>
+        <p class="eyebrow">Your Library</p>
+        <h2>Welcome back</h2>
+        <p>Manage your anime, movies, favorites, watch status, and account.</p>
+    </div>
+</section>
+
+<form method="post" action="/auth/logout" style="margin-bottom: 1rem;">
+    <button type="submit" class="random-button">Logout</button>
+</form>
+
+<div class="dashboard-tabs">
+    <button class="@(activeSection == "overview" ? "active-tab" : "")" @onclick='() => ChangeSection("overview")'>Overview</button>
+    <button class="@(activeSection == "all" ? "active-tab" : "")" @onclick='() => ChangeSection("all")'>All Saved</button>
+    <button class="@(activeSection == "watching" ? "active-tab" : "")" @onclick='() => ChangeSection("watching")'>Watching</button>
+    <button class="@(activeSection == "want" ? "active-tab" : "")" @onclick='() => ChangeSection("want")'>Want to Watch</button>
+    <button class="@(activeSection == "watched" ? "active-tab" : "")" @onclick='() => ChangeSection("watched")'>Watched</button>
+    <button class="@(activeSection == "dropped" ? "active-tab" : "")" @onclick='() => ChangeSection("dropped")'>Dropped</button>
+    <button class="@(activeSection == "favorites" ? "active-tab" : "")" @onclick='() => ChangeSection("favorites")'>Favorites</button>
+    <button class="@(activeSection == "account" ? "active-tab" : "")" @onclick='() => ChangeSection("account")'>Account</button>
+</div>
+
+@if (isLoading)
+{
+    <section class="dashboard-panel">
+        <p>Loading dashboard...</p>
+    </section>
+}
+else if (activeSection == "account")
+{
+    <section class="dashboard-panel">
+        <h2>Account Settings</h2>
+        <p>Update your login email, change your password, or permanently delete your account.</p>
+
+        @if (isAccountLoading)
+        {
+            <p>Loading account...</p>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(accountSuccessMessage))
+            {
+                <p class="success-text">@accountSuccessMessage</p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(accountErrorMessage))
+            {
+                <p class="error-text">@accountErrorMessage</p>
+            }
+
+            <div class="account-grid">
+                <EditForm Model="profileModel" OnValidSubmit="UpdateProfileAsync" FormName="profile-settings-form" class="account-card">
+                    <DataAnnotationsValidator />
+
+                    <h3>Profile</h3>
+                    <p class="account-help-text">Your app uses your email as your username for sign in.</p>
+
+                    <label for="accountEmail">Email address</label>
+                    <InputText
+                        id="accountEmail"
+                        class="auth-input"
+                        type="email"
+                        autocomplete="email"
+                        @bind-Value="profileModel.Email" />
+                    <ValidationMessage For="() => profileModel.Email" />
+
+                    <label for="profilePassword">Current password</label>
+                    <InputText
+                        id="profilePassword"
+                        class="auth-input"
+                        type="password"
+                        autocomplete="current-password"
+                        placeholder="Required to update email"
+                        @bind-Value="profileModel.CurrentPassword" />
+                    <ValidationMessage For="() => profileModel.CurrentPassword" />
+
+                    <button type="submit" class="filter-button" disabled="@isAccountSubmitting">
+                        @(isAccountSubmitting ? "Saving..." : "Save Profile")
+                    </button>
+                </EditForm>
+
+                <EditForm Model="passwordModel" OnValidSubmit="ChangePasswordAsync" FormName="password-settings-form" class="account-card">
+                    <DataAnnotationsValidator />
+
+                    <h3>Change Password</h3>
+                    <p class="account-help-text">Use at least 6 characters.</p>
+
+                    <label for="currentPassword">Current password</label>
+                    <InputText
+                        id="currentPassword"
+                        class="auth-input"
+                        type="password"
+                        autocomplete="current-password"
+                        @bind-Value="passwordModel.CurrentPassword" />
+                    <ValidationMessage For="() => passwordModel.CurrentPassword" />
+
+                    <label for="newPassword">New password</label>
+                    <InputText
+                        id="newPassword"
+                        class="auth-input"
+                        type="password"
+                        autocomplete="new-password"
+                        @bind-Value="passwordModel.NewPassword" />
+                    <ValidationMessage For="() => passwordModel.NewPassword" />
+
+                    <label for="confirmNewPassword">Confirm new password</label>
+                    <InputText
+                        id="confirmNewPassword"
+                        class="auth-input"
+                        type="password"
+                        autocomplete="new-password"
+                        @bind-Value="passwordModel.ConfirmNewPassword" />
+                    <ValidationMessage For="() => passwordModel.ConfirmNewPassword" />
+
+                    <button type="submit" class="filter-button" disabled="@isAccountSubmitting">
+                        @(isAccountSubmitting ? "Updating..." : "Change Password")
+                    </button>
+                </EditForm>
+
+                <EditForm Model="deleteAccountModel" OnValidSubmit="DeleteAccountAsync" FormName="delete-account-form" class="account-card danger-zone">
+                    <DataAnnotationsValidator />
+
+                    <h3>Delete Account</h3>
+                    <p class="account-help-text">
+                        This permanently deletes your account and all saved anime/movie data.
+                        Type <strong>DELETE</strong> and enter your password to confirm.
+                    </p>
+
+                    <label for="deleteConfirm">Confirmation</label>
+                    <InputText
+                        id="deleteConfirm"
+                        class="auth-input"
+                        autocomplete="off"
+                        placeholder="Type DELETE"
+                        @bind-Value="deleteAccountModel.Confirmation" />
+                    <ValidationMessage For="() => deleteAccountModel.Confirmation" />
+
+                    <label for="deletePassword">Current password</label>
+                    <InputText
+                        id="deletePassword"
+                        class="auth-input"
+                        type="password"
+                        autocomplete="current-password"
+                        @bind-Value="deleteAccountModel.CurrentPassword" />
+                    <ValidationMessage For="() => deleteAccountModel.CurrentPassword" />
+
+                    <button type="submit" class="danger-button" disabled="@isAccountSubmitting">
+                        @(isAccountSubmitting ? "Deleting..." : "Delete My Account")
+                    </button>
+                </EditForm>
+            </div>
+        }
+    </section>
+}
+else
+{
+    @if (activeSection == "overview")
+    {
+        <section class="dashboard-grid">
+            <div class="dashboard-card"><h2>@WatchingItems.Count</h2><p>Watching</p></div>
+            <div class="dashboard-card"><h2>@WantToWatchItems.Count</h2><p>Want to Watch</p></div>
+            <div class="dashboard-card"><h2>@WatchedItems.Count</h2><p>Watched</p></div>
+            <div class="dashboard-card"><h2>@DroppedItems.Count</h2><p>Dropped</p></div>
+            <div class="dashboard-card"><h2>@FavoriteItems.Count</h2><p>Favorites</p></div>
+            <div class="dashboard-card"><h2>@AllItems.Count</h2><p>Total Saved</p></div>
+        </section>
+    }
+
+    <section class="dashboard-panel">
+        <h2>@CurrentSectionTitle</h2>
+        <p>Loaded @AllItems.Count saved item@(AllItems.Count == 1 ? "" : "s"). Showing @CurrentSectionItems.Count item@(CurrentSectionItems.Count == 1 ? "" : "s") in this section.</p>
+
+        @if (CurrentSectionItems.Count == 0)
+        {
+            <p class="no-results">No saved items in this section yet.</p>
+        }
+        else
+        {
+            <div class="dashboard-library-grid">
+                @foreach (var item in CurrentSectionItems)
+                {
+                    <article class="dashboard-media-card" @onclick="() => OpenDashboardModal(item)">
+                        <img src="@SafeImage(item.ImageUrl)" alt="@item.Title poster" />
+
+                        <div class="dashboard-media-body">
+                            <h3>@item.Title</h3>
+                            <p><strong>Type:</strong> @item.MediaType</p>
+                            <p><strong>Status:</strong> @(string.IsNullOrWhiteSpace(item.Status) ? "Not set" : item.Status)</p>
+
+                            @if (item.IsFavorite)
+                            {
+                                <p>❤️ Favorite</p>
+                            }
+
+                            <div class="status-buttons" @onclick:stopPropagation="true">
+                                <button @onclick='() => UpdateStatus((item.Id, "Watching"))'>Watching</button>
+                                <button @onclick='() => UpdateStatus((item.Id, "Want to Watch"))'>Want to Watch</button>
+                                <button @onclick='() => UpdateStatus((item.Id, "Watched"))'>Watched</button>
+                                <button @onclick='() => UpdateStatus((item.Id, "Dropped"))'>Dropped</button>
+                            </div>
+
+                            <button class="filter-button" @onclick:stopPropagation="true" @onclick="() => ToggleFavorite(item.Id)">
+                                @(item.IsFavorite ? "Remove Favorite" : "Add Favorite")
+                            </button>
+
+                            <button class="danger-button" @onclick:stopPropagation="true" @onclick="() => DeleteItem(item.Id)">
+                                Delete
+                            </button>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+}
+
+@if (showDashboardModal && selectedItem is not null)
+{
+    <div class="modal-overlay active" @onclick="CloseDashboardModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <button class="close-button" @onclick="CloseDashboardModal">x</button>
+
+            <h2>@selectedItem.Title</h2>
+
+            <button class="favorite-btn-modal" @onclick="() => ToggleFavorite(selectedItem.Id)">
+                @(selectedItem.IsFavorite ? "Remove from Favorites ❤️" : "Add to Favorites 🤍")
+            </button>
+
+            <img src="@SafeImage(selectedItem.ImageUrl)" alt="@selectedItem.Title poster" class="modal-poster" />
+
+            <p><strong>Type:</strong> @selectedItem.MediaType</p>
+            <p><strong>Status:</strong> @(string.IsNullOrWhiteSpace(selectedItem.Status) ? "Not set" : selectedItem.Status)</p>
+            <p><strong>Media ID:</strong> @selectedItem.MediaId</p>
+
+            <div class="status-buttons">
+                <button @onclick='() => UpdateStatus((selectedItem.Id, "Watching"))'>Watching</button>
+                <button @onclick='() => UpdateStatus((selectedItem.Id, "Want to Watch"))'>Want to Watch</button>
+                <button @onclick='() => UpdateStatus((selectedItem.Id, "Watched"))'>Watched</button>
+                <button @onclick='() => UpdateStatus((selectedItem.Id, "Dropped"))'>Dropped</button>
+            </div>
+
+            <hr class="modal-clear" />
+
+            <p class="synopsis">
+                This item is saved in your personal library. You can change the watch status, favorite it, or delete it from the dashboard.
+            </p>
+
+            <button class="danger-button" @onclick="() => DeleteItem(selectedItem.Id)">Delete from Dashboard</button>
+        </div>
+    </div>
+}
+
+@code {
+    private string activeSection = "overview";
+    private bool isLoading = true;
+    private bool showDashboardModal;
+    private SavedMediaItem? selectedItem;
+    private int? selectedItemId;
+
+    private List<SavedMediaItem> AllItems = new();
+
+    private bool isAccountLoading = true;
+    private bool isAccountSubmitting;
+    private string accountSuccessMessage = "";
+    private string accountErrorMessage = "";
+    private ApplicationUser? currentUser;
+    private ProfileModel profileModel = new();
+    private PasswordModel passwordModel = new();
+    private DeleteAccountModel deleteAccountModel = new();
+
+    private List<SavedMediaItem> WatchingItems => AllItems.Where(x => StatusMatches(x, "Watching")).ToList();
+    private List<SavedMediaItem> WantToWatchItems => AllItems.Where(x => StatusMatches(x, "Want to Watch")).ToList();
+    private List<SavedMediaItem> WatchedItems => AllItems.Where(x => StatusMatches(x, "Watched")).ToList();
+    private List<SavedMediaItem> DroppedItems => AllItems.Where(x => StatusMatches(x, "Dropped")).ToList();
+    private List<SavedMediaItem> FavoriteItems => AllItems.Where(x => x.IsFavorite).ToList();
+
+    private List<SavedMediaItem> CurrentSectionItems => activeSection switch
+    {
+        "overview" => AllItems.Take(6).ToList(),
+        "all" => AllItems,
+        "watching" => WatchingItems,
+        "want" => WantToWatchItems,
+        "watched" => WatchedItems,
+        "dropped" => DroppedItems,
+        "favorites" => FavoriteItems,
+        _ => new List<SavedMediaItem>()
+    };
+
+    private string CurrentSectionTitle => activeSection switch
+    {
+        "overview" => "Recent Saved Items",
+        "all" => "All Saved Items",
+        "watching" => "Watching",
+        "want" => "Want to Watch",
+        "watched" => "Watched",
+        "dropped" => "Dropped",
+        "favorites" => "Favorites",
+        _ => "Saved Items"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItems();
+        await LoadAccountAsync();
+    }
+
+    private async Task LoadItems()
+    {
+        isLoading = true;
+        AllItems = await SavedMediaService.GetMyItemsAsync();
+        isLoading = false;
+
+        if (selectedItemId.HasValue)
+        {
+            selectedItem = AllItems.FirstOrDefault(x => x.Id == selectedItemId.Value);
+
+            if (selectedItem is null)
+            {
+                showDashboardModal = false;
+                selectedItemId = null;
+            }
+        }
+    }
+
+    private async Task LoadAccountAsync()
+    {
+        isAccountLoading = true;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUser = await UserManager.GetUserAsync(authState.User);
+
+        if (currentUser is null)
+        {
+            accountErrorMessage = "Unable to load the current account.";
+            isAccountLoading = false;
+            return;
+        }
+
+        profileModel.Email = currentUser.Email ?? "";
+        profileModel.CurrentPassword = "";
+        isAccountLoading = false;
+    }
+
+    private void ChangeSection(string section)
+    {
+        activeSection = section;
+        ClearAccountMessages();
+    }
+
+    private void OpenDashboardModal(SavedMediaItem item)
+    {
+        selectedItem = item;
+        selectedItemId = item.Id;
+        showDashboardModal = true;
+    }
+
+    private void CloseDashboardModal()
+    {
+        selectedItem = null;
+        selectedItemId = null;
+        showDashboardModal = false;
+    }
+
+    private async Task DeleteItem(int id)
+    {
+        await SavedMediaService.DeleteItemAsync(id);
+
+        if (selectedItemId == id)
+        {
+            CloseDashboardModal();
+        }
+
+        await LoadItems();
+    }
+
+    private async Task ToggleFavorite(int id)
+    {
+        await SavedMediaService.ToggleFavoriteAsync(id);
+        await LoadItems();
+    }
+
+    private async Task UpdateStatus((int id, string status) data)
+    {
+        await SavedMediaService.UpdateStatusAsync(data.id, data.status);
+        await LoadItems();
+    }
+
+    private async Task UpdateProfileAsync()
+    {
+        if (isAccountSubmitting)
+        {
+            return;
+        }
+
+        ClearAccountMessages();
+        isAccountSubmitting = true;
+
+        try
+        {
+            var user = await GetCurrentUserAsync();
+            if (user is null)
+            {
+                accountErrorMessage = "Unable to load the current account.";
+                return;
+            }
+
+            var newEmail = profileModel.Email.Trim();
+            var currentEmail = user.Email ?? "";
+
+            if (string.Equals(newEmail, currentEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                accountSuccessMessage = "No profile changes were needed.";
+                return;
+            }
+
+            var existingUser = await UserManager.FindByEmailAsync(newEmail);
+            if (existingUser is not null && existingUser.Id != user.Id)
+            {
+                accountErrorMessage = "That email address is already used by another account.";
+                return;
+            }
+
+            if (!await UserManager.CheckPasswordAsync(user, profileModel.CurrentPassword))
+            {
+                accountErrorMessage = "Current password is incorrect.";
+                return;
+            }
+
+            var emailResult = await UserManager.SetEmailAsync(user, newEmail);
+            if (!emailResult.Succeeded)
+            {
+                accountErrorMessage = FormatIdentityErrors(emailResult);
+                return;
+            }
+
+            var usernameResult = await UserManager.SetUserNameAsync(user, newEmail);
+            if (!usernameResult.Succeeded)
+            {
+                accountErrorMessage = FormatIdentityErrors(usernameResult);
+                return;
+            }
+
+            await SignInManager.RefreshSignInAsync(user);
+
+            currentUser = user;
+            profileModel.CurrentPassword = "";
+            accountSuccessMessage = "Profile updated successfully.";
+        }
+        finally
+        {
+            isAccountSubmitting = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (isAccountSubmitting)
+        {
+            return;
+        }
+
+        ClearAccountMessages();
+        isAccountSubmitting = true;
+
+        try
+        {
+            var user = await GetCurrentUserAsync();
+            if (user is null)
+            {
+                accountErrorMessage = "Unable to load the current account.";
+                return;
+            }
+
+            var result = await UserManager.ChangePasswordAsync(
+                user,
+                passwordModel.CurrentPassword,
+                passwordModel.NewPassword);
+
+            if (!result.Succeeded)
+            {
+                accountErrorMessage = FormatIdentityErrors(result);
+                return;
+            }
+
+            await SignInManager.RefreshSignInAsync(user);
+
+            passwordModel = new PasswordModel();
+            accountSuccessMessage = "Password changed successfully.";
+        }
+        finally
+        {
+            isAccountSubmitting = false;
+        }
+    }
+
+    private async Task DeleteAccountAsync()
+    {
+        if (isAccountSubmitting)
+        {
+            return;
+        }
+
+        ClearAccountMessages();
+        isAccountSubmitting = true;
+
+        try
+        {
+            if (!string.Equals(deleteAccountModel.Confirmation.Trim(), "DELETE", StringComparison.Ordinal))
+            {
+                accountErrorMessage = "Type DELETE exactly to confirm account deletion.";
+                return;
+            }
+
+            var user = await GetCurrentUserAsync();
+            if (user is null)
+            {
+                accountErrorMessage = "Unable to load the current account.";
+                return;
+            }
+
+            if (!await UserManager.CheckPasswordAsync(user, deleteAccountModel.CurrentPassword))
+            {
+                accountErrorMessage = "Current password is incorrect.";
+                return;
+            }
+
+            var savedItems = await DbContext.SavedMediaItems
+                .Where(x => x.UserId == user.Id)
+                .ToListAsync();
+
+            DbContext.SavedMediaItems.RemoveRange(savedItems);
+            await DbContext.SaveChangesAsync();
+
+            var result = await UserManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                accountErrorMessage = FormatIdentityErrors(result);
+                return;
+            }
+
+            await SignInManager.SignOutAsync();
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        finally
+        {
+            isAccountSubmitting = false;
+        }
+    }
+
+    private async Task<ApplicationUser?> GetCurrentUserAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return await UserManager.GetUserAsync(authState.User);
+    }
+
+    private void ClearAccountMessages()
+    {
+        accountSuccessMessage = "";
+        accountErrorMessage = "";
+    }
+
+    private static string FormatIdentityErrors(IdentityResult result) =>
+        string.Join(" ", result.Errors.Select(error => error.Description));
+
+    private static bool StatusMatches(SavedMediaItem item, string status)
+    {
+        var itemStatus = NormalizeStatus(item.Status);
+        var targetStatus = NormalizeStatus(status);
+
+        if (targetStatus == "want to watch")
+        {
+            return itemStatus is "want to watch" or "plan to watch" or "planning" or "planned";
+        }
+
+        return itemStatus == targetStatus;
+    }
+
+    private static string NormalizeStatus(string? status) =>
+        (status ?? "")
+            .Trim()
+            .Replace("_", " ")
+            .Replace("-", " ")
+            .ToLowerInvariant();
+
+    private static string SafeImage(string? imageUrl) =>
+        string.IsNullOrWhiteSpace(imageUrl)
+            ? "https://placehold.co/300x450?text=No+Poster"
+            : imageUrl;
+
+    private class ProfileModel
+    {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Current password is required.")]
+        public string CurrentPassword { get; set; } = "";
+    }
+
+    private class PasswordModel
+    {
+        [Required(ErrorMessage = "Current password is required.")]
+        public string CurrentPassword { get; set; } = "";
+
+        [Required(ErrorMessage = "New password is required.")]
+        [MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
+        public string NewPassword { get; set; } = "";
+
+        [Required(ErrorMessage = "Confirm your new password.")]
+        [Compare(nameof(NewPassword), ErrorMessage = "Passwords do not match.")]
+        public string ConfirmNewPassword { get; set; } = "";
+    }
+
+    private class DeleteAccountModel
+    {
+        [Required(ErrorMessage = "Type DELETE to confirm.")]
+        public string Confirmation { get; set; } = "";
+
+        [Required(ErrorMessage = "Current password is required.")]
+        public string CurrentPassword { get; set; } = "";
+    }
+}

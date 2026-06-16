@@ -1,0 +1,59 @@
+@using AnimeMovieTracker.Models
+
+<section class="dashboard-panel">
+    <h2>@Title</h2>
+
+    @if (Items.Count == 0)
+    {
+        <p class="no-results">No saved items in this section yet.</p>
+    }
+    else
+    {
+        <div class="dashboard-library-grid">
+            @foreach (var item in Items)
+            {
+                <div class="dashboard-media-card">
+                    <img src="@item.ImageUrl" alt="@item.Title poster" />
+
+                    <div class="dashboard-media-body">
+                        <h3>@item.Title</h3>
+                        <p>@item.MediaType</p>
+
+                        @if (!string.IsNullOrWhiteSpace(item.Status))
+                        {
+                            <p><strong>Status:</strong> @item.Status</p>
+                        }
+
+                        @if (item.IsFavorite)
+                        {
+                            <p>❤️ Favorite</p>
+                        }
+
+                        <div class="status-buttons">
+                            <button @onclick='() => OnStatus.InvokeAsync((item.Id, "Watching"))'>Watching</button>
+                            <button @onclick='() => OnStatus.InvokeAsync((item.Id, "Want to Watch"))'>Want to Watch</button>
+                            <button @onclick='() => OnStatus.InvokeAsync((item.Id, "Watched"))'>Watched</button>
+                            <button @onclick='() => OnStatus.InvokeAsync((item.Id, "Dropped"))'>Dropped</button>
+                        </div>
+
+                        <button class="filter-button" @onclick="() => OnFavorite.InvokeAsync(item.Id)">
+                            @(item.IsFavorite ? "Remove Favorite" : "Add Favorite")
+                        </button>
+
+                        <button class="danger-button" @onclick="() => OnDelete.InvokeAsync(item.Id)">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public List<SavedMediaItem> Items { get; set; } = new();
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+    [Parameter] public EventCallback<int> OnFavorite { get; set; }
+    [Parameter] public EventCallback<(int id, string status)> OnStatus { get; set; }
+}

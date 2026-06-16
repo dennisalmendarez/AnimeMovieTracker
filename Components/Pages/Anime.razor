@@ -1,0 +1,371 @@
+@page "/anime"
+@rendermode InteractiveServer
+@using AnimeMovieTracker.Components.Models
+@using AnimeMovieTracker.Models
+@using AnimeMovieTracker.Components.Shared
+@using AnimeMovieTracker.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager Navigation
+@inject AniListService AniListService
+@inject SavedMediaService SavedMediaService
+
+<PageTitle>Anime</PageTitle>
+
+<h1>Anime</h1>
+
+<PageActionBar>
+    <button class="filter-button" @onclick='() => ChangeSort("TITLE_ROMAJI")'>A-Z</button>
+    <button class="filter-button" @onclick='() => ChangeSort("TRENDING_DESC")'>Trending</button>
+    <button class="filter-button" @onclick='() => ChangeSort("SCORE_DESC")'>Top Rated</button>
+    <button class="random-button" @onclick="RandomAnime">🎲 Random Anime</button>
+</PageActionBar>
+
+<div class="search-row">
+    <input class="search-box" placeholder="Search all anime from AniList..." @bind="searchText" @bind:event="oninput" />
+
+    <select class="search-box" @bind="selectedGenre">
+        <option value="">All Genres</option>
+        @foreach (var genre in genres)
+        {
+            <option value="@genre">@genre</option>
+        }
+    </select>
+
+    <button class="filter-button" @onclick="SearchAnime">Search</button>
+    <button class="filter-button" @onclick="ClearSearch">Clear</button>
+</div>
+
+@if (isLoading)
+{
+    <p class="loader">Loading anime...</p>
+}
+else
+{
+    <p>Showing 30 anime from AniList. Page @currentPage</p>
+
+    <div class="media-grid">
+        @foreach (var item in animeList)
+        {
+            <div @onclick="() => OpenAnimeDetails(item)">
+                <MediaCard Item="item" OnFavorite="SaveAnimeFavorite" OnStatus="SaveAnimeStatus" />
+            </div>
+        }
+    </div>
+
+    <div class="pagination">
+        <button @onclick="PreviousPage" disabled="@(currentPage == 1)">&lt;</button>
+
+        @foreach (var pageNumber in VisiblePages)
+        {
+            <button class="@(pageNumber == currentPage ? "active-page" : "")" @onclick="() => GoToPage(pageNumber)">
+                @pageNumber
+            </button>
+        }
+
+        <button @onclick="NextPage" disabled="@(!hasNextPage)">&gt;</button>
+    </div>
+}
+
+@if (showModal && selectedAnime is not null)
+{
+    <div class="modal-overlay active" @onclick="CloseModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <button class="close-button" @onclick="CloseModal">×</button>
+
+            <h2>@selectedAnime.Title</h2>
+
+            <button class="favorite-btn-modal" @onclick="ToggleSelectedFavorite">
+                @(selectedAnime.IsFavorite ? "Remove from Favorites ❤️" : "Add to Favorites 🤍")
+            </button>
+
+            <img src="@selectedAnime.ImageUrl" alt="@selectedAnime.Title cover" class="modal-poster" />
+
+            <p><strong>Score:</strong> @(selectedAnime.Rating == 0 ? "N/A" : $"{selectedAnime.Rating * 10:0} / 100")</p>
+            @if (!string.IsNullOrWhiteSpace(selectedAnime.Status))
+            {
+                <p><strong>Status:</strong> @selectedAnime.Status</p>
+            }
+            <p><strong>Year:</strong> @(selectedAnime.Year == 0 ? "N/A" : selectedAnime.Year)</p>
+            <p><strong>Genres:</strong> @selectedAnime.Genre</p>
+            <div class="status-buttons">
+                <button @onclick='() => SetAnimeStatus("Watching")'>Watching</button>
+                <button @onclick='() => SetAnimeStatus("Want to Watch")'>Want to Watch</button>
+                <button @onclick='() => SetAnimeStatus("Watched")'>Watched</button>
+                <button @onclick='() => SetAnimeStatus("Dropped")'>Dropped</button>
+            </div>
+
+            <hr class="modal-clear" />
+
+            <p class="synopsis">@CleanDescription(selectedAnime.Description)</p>
+
+            <h3>Main Characters</h3>
+
+            @if (isLoadingCharacters)
+            {
+                <p>Loading characters...</p>
+            }
+            else if (characters.Count == 0)
+            {
+                <p class="no-results">
+                    No character information is available for this title yet.
+                </p>
+            }
+            else
+            {
+                <div class="characters-grid">
+                    @foreach (var character in characters)
+                    {
+                        <div class="character-card">
+                            <img src="@character.ImageUrl" alt="@character.Name" />
+                            <p><strong>@character.Name</strong></p>
+                            @if (!string.IsNullOrWhiteSpace(character.VoiceActor))
+                            {
+                                <p class="va-name">VA: @character.VoiceActor</p>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<MediaItem> animeList = new();
+    private string searchText = "";
+    private bool isLoading = true;
+    private int currentPage = 1;
+    private bool hasNextPage = true;
+    private string currentSort = "TITLE_ROMAJI";
+    private List<string> genres = new();
+    private string selectedGenre = "";
+
+    private MediaItem? selectedAnime;
+    private bool showModal = false;
+
+    private List<AnimeCharacter> characters = new();
+    private bool isLoadingCharacters = false;
+
+    private IEnumerable<int> VisiblePages =>
+        Enumerable.Range(Math.Max(1, currentPage - 2), 6);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("sort", out var sortValue))
+        {
+            currentSort = sortValue.ToString();
+        }
+
+        genres = await AniListService.GetGenresAsync();
+        await LoadPage(1);
+    }
+
+    private async Task LoadPage(int page)
+    {
+        isLoading = true;
+
+        var selectedGenres = string.IsNullOrWhiteSpace(selectedGenre)
+            ? new List<string>()
+            : new List<string> { selectedGenre };
+
+        var result = await AniListService.GetAnimePageAsync(
+            page: page,
+            perPage: 30,
+            sort: currentSort,
+            search: searchText,
+            genres: selectedGenres
+        );
+
+        animeList = result.Items;
+        await ApplySavedStateToAnime();
+
+        currentPage = result.CurrentPage;
+        hasNextPage = result.HasNextPage;
+
+        isLoading = false;
+    }
+
+
+    private async Task ApplySavedStateToAnime()
+    {
+        var savedItems = await SavedMediaService.GetMyItemsAsync();
+
+        foreach (var anime in animeList)
+        {
+            ApplySavedStateToAnime(anime, savedItems);
+        }
+    }
+
+    private async Task ApplySavedStateToAnime(MediaItem anime)
+    {
+        var savedItems = await SavedMediaService.GetMyItemsAsync();
+        ApplySavedStateToAnime(anime, savedItems);
+    }
+
+    private static void ApplySavedStateToAnime(MediaItem anime, List<SavedMediaItem> savedItems)
+    {
+        var saved = savedItems.FirstOrDefault(x =>
+            x.MediaId == anime.Id &&
+            string.Equals(x.MediaType, "Anime", StringComparison.OrdinalIgnoreCase));
+
+        if (saved is null)
+            return;
+
+        anime.Status = saved.Status;
+        anime.IsFavorite = saved.IsFavorite;
+    }
+
+    private async Task SearchAnime()
+    {
+        currentPage = 1;
+        await LoadPage(1);
+    }
+
+    private async Task ClearSearch()
+    {
+        searchText = "";
+        selectedGenre = "";
+        currentPage = 1;
+        await LoadPage(1);
+    }
+
+    private async Task GoToPage(int page)
+    {
+        await LoadPage(page);
+    }
+
+    private async Task PreviousPage()
+    {
+        if (currentPage > 1)
+        {
+            await LoadPage(currentPage - 1);
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (hasNextPage)
+        {
+            await LoadPage(currentPage + 1);
+        }
+    }
+
+    private async Task ChangeSort(string sort)
+    {
+        currentSort = sort;
+        currentPage = 1;
+        await LoadPage(1);
+    }
+
+    private async Task OpenAnimeDetails(MediaItem item)
+    {
+        selectedAnime = item;
+        showModal = true;
+
+        isLoadingCharacters = true;
+        characters = await AniListService.GetAnimeCharactersAsync(item.Id);
+        isLoadingCharacters = false;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedAnime = null;
+        characters.Clear();
+    }
+
+
+    private async Task SaveAnimeFavorite(MediaItem item)
+    {
+        await SavedMediaService.SaveOrUpdateItemAsync(
+            item.Id,
+            "Anime",
+            item.Title,
+            item.ImageUrl,
+            item.Status,
+            item.IsFavorite
+        );
+    }
+
+    private async Task SaveAnimeStatus((MediaItem item, string status) data)
+    {
+        data.item.Status = data.status;
+
+        await SavedMediaService.SaveOrUpdateItemAsync(
+            data.item.Id,
+            "Anime",
+            data.item.Title,
+            data.item.ImageUrl,
+            data.item.Status,
+            data.item.IsFavorite
+        );
+    }
+
+    private async Task ToggleSelectedFavorite()
+    {
+        if (selectedAnime is null)
+            return;
+
+        selectedAnime.IsFavorite = !selectedAnime.IsFavorite;
+
+        await SavedMediaService.SaveOrUpdateItemAsync(
+            selectedAnime.Id,
+            "Anime",
+            selectedAnime.Title,
+            selectedAnime.ImageUrl,
+            selectedAnime.Status,
+            selectedAnime.IsFavorite
+        );
+    }
+
+    private string CleanDescription(string description)
+    {
+        return description
+            .Replace("<br>", " ")
+            .Replace("<br/>", " ")
+            .Replace("<br />", " ")
+            .Replace("<i>", "")
+            .Replace("</i>", "");
+    }
+
+    private async Task RandomAnime()
+    {
+        var randomPage = Random.Shared.Next(1, 5000);
+
+        var result = await AniListService.GetAnimePageAsync(
+            page: randomPage,
+            perPage: 1,
+            sort: "POPULARITY_DESC",
+            search: null,
+            genres: new List<string>()
+        );
+
+        if (result.Items.Count > 0)
+        {
+            var randomAnime = result.Items.First();
+            await ApplySavedStateToAnime(randomAnime);
+            await OpenAnimeDetails(randomAnime);
+        }
+    }
+
+    private async Task SetAnimeStatus(string status)
+    {
+        if (selectedAnime is null)
+            return;
+
+        selectedAnime.Status = status;
+
+        await SavedMediaService.SaveOrUpdateItemAsync(
+            selectedAnime.Id,
+            "Anime",
+            selectedAnime.Title,
+            selectedAnime.ImageUrl,
+            selectedAnime.Status,
+            selectedAnime.IsFavorite
+        );
+    }
+}

@@ -1,0 +1,77 @@
+@page "/login"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager Navigation
+
+<PageTitle>Sign In</PageTitle>
+
+<section class="auth-section">
+    <div class="auth-shell">
+        <div class="auth-art-panel">
+            <p class="eyebrow">Track • Save • Watch</p>
+            <h1>Welcome back</h1>
+            <p>Sign in to view your saved anime, movie watchlist, favorites, and dashboard progress.</p>
+        </div>
+
+        <div class="auth-card auth-card-modern">
+            <h1>Sign In</h1>
+            <p class="auth-subtitle">Access your anime and movie library.</p>
+
+            @if (registered)
+            {
+                <p class="success-text">Account created successfully. You can sign in now.</p>
+            }
+
+            @if (hasError)
+            {
+                <p class="error-text">Invalid email or password.</p>
+            }
+
+            <form class="auth-form" method="post" action="/auth/login">
+                <div class="input-group">
+                    <label for="email">Email address</label>
+                    <input
+                        id="email"
+                        class="auth-input"
+                        name="email"
+                        type="email"
+                        placeholder="Email address"
+                        autocomplete="username"
+                        required />
+                </div>
+
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input
+                        id="password"
+                        class="auth-input"
+                        name="password"
+                        type="password"
+                        placeholder="Password"
+                        autocomplete="current-password"
+                        required />
+                </div>
+
+                <button type="submit" class="auth-primary-button">Sign In</button>
+            </form>
+
+            <p class="auth-footer">
+                Need an account? <a href="/register" class="text-link">Create one</a>
+            </p>
+        </div>
+    </div>
+</section>
+
+@code {
+    private bool hasError;
+    private bool registered;
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        hasError = query.ContainsKey("error");
+        registered = query.ContainsKey("registered");
+    }
+}
