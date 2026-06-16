@@ -1,0 +1,258 @@
+/* /Components/Layout/MainLayout.razor.rz.scp.css */
+.app-shell[b-vj1uou0nwf] {
+    min-height: 100vh;
+    background: #74b7df;
+}
+
+.app-header[b-vj1uou0nwf] {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1rem 2rem;
+    background: transparent;
+}
+
+.app-title[b-vj1uou0nwf] {
+    color: #06162e;
+    font-size: 1.4rem;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.app-title:hover[b-vj1uou0nwf] {
+    color: #0b4f9c;
+}
+
+.app-main[b-vj1uou0nwf] {
+    padding: 0 2rem 2rem;
+}
+
+#blazor-error-ui[b-vj1uou0nwf] {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss[b-vj1uou0nwf] {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+@media (max-width: 700px) {
+    .app-header[b-vj1uou0nwf] {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .app-main[b-vj1uou0nwf] {
+        padding: 0 1rem 1.5rem;
+    }
+}
+/* /Components/Layout/NavMenu.razor.rz.scp.css */
+.nav-menu[b-52ub80uhe0] {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.nav-link[b-52ub80uhe0] {
+    color: #06162e;
+    text-decoration: none;
+    font-weight: 700;
+    padding: 0.55rem 0.8rem;
+    border-radius: 0.6rem;
+}
+
+.nav-link:hover[b-52ub80uhe0],
+.nav-link.active[b-52ub80uhe0] {
+    background: rgba(255, 255, 255, 0.45);
+    color: #0b4f9c;
+}
+
+.logout-form[b-52ub80uhe0] {
+    margin: 0;
+}
+
+.logout-button[b-52ub80uhe0] {
+    border: none;
+    border-radius: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    background: #c51f1f;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.logout-button:hover[b-52ub80uhe0] {
+    background: #a71919;
+}
+/* /Components/Layout/ReconnectModal.razor.rz.scp.css */
+.components-reconnect-first-attempt-visible[b-hp99urdslh],
+.components-reconnect-repeated-attempt-visible[b-hp99urdslh],
+.components-reconnect-failed-visible[b-hp99urdslh],
+.components-pause-visible[b-hp99urdslh],
+.components-resume-failed-visible[b-hp99urdslh],
+.components-rejoining-animation[b-hp99urdslh] {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-show .components-reconnect-first-attempt-visible[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-show .components-rejoining-animation[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-paused .components-pause-visible[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-resume-failed .components-resume-failed-visible[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-retrying[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-retrying .components-reconnect-repeated-attempt-visible[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-retrying .components-rejoining-animation[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-failed[b-hp99urdslh],
+#components-reconnect-modal.components-reconnect-failed .components-reconnect-failed-visible[b-hp99urdslh] {
+    display: block;
+}
+
+
+#components-reconnect-modal[b-hp99urdslh] {
+    background-color: white;
+    width: 20rem;
+    margin: 20vh auto;
+    padding: 2rem;
+    border: 0;
+    border-radius: 0.5rem;
+    box-shadow: 0 3px 6px 2px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: display 0.5s allow-discrete, overlay 0.5s allow-discrete;
+    animation: components-reconnect-modal-fadeOutOpacity-b-hp99urdslh 0.5s both;
+    &[open]
+
+{
+    animation: components-reconnect-modal-slideUp-b-hp99urdslh 1.5s cubic-bezier(.05, .89, .25, 1.02) 0.3s, components-reconnect-modal-fadeInOpacity-b-hp99urdslh 0.5s ease-in-out 0.3s;
+    animation-fill-mode: both;
+}
+
+}
+
+#components-reconnect-modal[b-hp99urdslh]::backdrop {
+    background-color: rgba(0, 0, 0, 0.4);
+    animation: components-reconnect-modal-fadeInOpacity-b-hp99urdslh 0.5s ease-in-out;
+    opacity: 1;
+}
+
+@keyframes components-reconnect-modal-slideUp-b-hp99urdslh {
+    0% {
+        transform: translateY(30px) scale(0.95);
+    }
+
+    100% {
+        transform: translateY(0);
+    }
+}
+
+@keyframes components-reconnect-modal-fadeInOpacity-b-hp99urdslh {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes components-reconnect-modal-fadeOutOpacity-b-hp99urdslh {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+.components-reconnect-container[b-hp99urdslh] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+#components-reconnect-modal p[b-hp99urdslh] {
+    margin: 0;
+    text-align: center;
+}
+
+#components-reconnect-modal button[b-hp99urdslh] {
+    border: 0;
+    background-color: #6b9ed2;
+    color: white;
+    padding: 4px 24px;
+    border-radius: 4px;
+}
+
+    #components-reconnect-modal button:hover[b-hp99urdslh] {
+        background-color: #3b6ea2;
+    }
+
+    #components-reconnect-modal button:active[b-hp99urdslh] {
+        background-color: #6b9ed2;
+    }
+
+.components-rejoining-animation[b-hp99urdslh] {
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+    .components-rejoining-animation div[b-hp99urdslh] {
+        position: absolute;
+        border: 3px solid #0087ff;
+        opacity: 1;
+        border-radius: 50%;
+        animation: components-rejoining-animation-b-hp99urdslh 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    }
+
+        .components-rejoining-animation div:nth-child(2)[b-hp99urdslh] {
+            animation-delay: -0.5s;
+        }
+
+@keyframes components-rejoining-animation-b-hp99urdslh {
+    0% {
+        top: 40px;
+        left: 40px;
+        width: 0;
+        height: 0;
+        opacity: 0;
+    }
+
+    4.9% {
+        top: 40px;
+        left: 40px;
+        width: 0;
+        height: 0;
+        opacity: 0;
+    }
+
+    5% {
+        top: 40px;
+        left: 40px;
+        width: 0;
+        height: 0;
+        opacity: 1;
+    }
+
+    100% {
+        top: 0px;
+        left: 0px;
+        width: 80px;
+        height: 80px;
+        opacity: 0;
+    }
+}
