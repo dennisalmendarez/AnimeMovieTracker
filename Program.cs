@@ -5,6 +5,8 @@ using AnimeMovieTracker.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using AnimeMovieTracker.Endpoints;
+using System.Net;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,8 +17,32 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpClient<AniListService>();
 builder.Services.AddHttpClient<MovieService>();
 
+var databaseUrl = builder.Configuration["DATABASE_URL"];
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (!string.IsNullOrWhiteSpace(databaseUrl))
+{
+    var databaseUri = new Uri(databaseUrl);
+    var userInfo = databaseUri.UserInfo.Split(':', 2);
+
+    var connectionBuilder = new NpgsqlConnectionStringBuilder
+    {
+        Host = databaseUri.Host,
+        Port = databaseUri.Port,
+        Database = databaseUri.AbsolutePath.TrimStart('/'),
+        Username = WebUtility.UrlDecode(userInfo[0]),
+        Password = userInfo.Length > 1 ? WebUtility.UrlDecode(userInfo[1]) : "",
+        SslMode = SslMode.Require
+    };
+
+    connectionString = connectionBuilder.ConnectionString;
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(connectionString));
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
