@@ -28,7 +28,7 @@ if (!string.IsNullOrWhiteSpace(databaseUrl))
     var connectionBuilder = new NpgsqlConnectionStringBuilder
     {
         Host = databaseUri.Host,
-        Port = databaseUri.Port,
+        Port = databaseUri.Port > 0 ? databaseUri.Port : 5432,
         Database = databaseUri.AbsolutePath.TrimStart('/'),
         Username = WebUtility.UrlDecode(userInfo[0]),
         Password = userInfo.Length > 1 ? WebUtility.UrlDecode(userInfo[1]) : "",
