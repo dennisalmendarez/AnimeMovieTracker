@@ -6,6 +6,9 @@ public class TmdbMovie
 {
     public int Id { get; set; }
 
+    [JsonPropertyName("adult")]
+    public bool Adult { get; set; }
+
     public string Title { get; set; } = "";
 
     public string Overview { get; set; } = "";

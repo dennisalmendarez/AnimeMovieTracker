@@ -25,11 +25,11 @@ public class MovieService
 
             if (genreId.HasValue)
             {
-                url = $"https://api.themoviedb.org/3/discover/movie?api_key={ApiKey}&page={page}&with_genres={genreId.Value}&sort_by=popularity.desc";
+                url = $"https://api.themoviedb.org/3/discover/movie?api_key={ApiKey}&page={page}&with_genres={genreId.Value}&sort_by=popularity.desc&include_adult=false";
             }
             else
             {
-                url = $"https://api.themoviedb.org/3/movie/{category}?api_key={ApiKey}&page={page}";
+                url = $"https://api.themoviedb.org/3/movie/{category}?api_key={ApiKey}&page={page}&include_adult=false";
             }
 
             var response = await _httpClient.GetAsync(url);
@@ -43,7 +43,9 @@ public class MovieService
 
             return new TmdbMoviePageResult
             {
-                Items = result?.Results ?? new(),
+                Items = result?.Results?
+                    .Where(m => !m.Adult)
+                    .ToList() ?? new(),
                 CurrentPage = result?.Page ?? page,
                 TotalPages = result?.TotalPages ?? 1
             };
@@ -63,7 +65,7 @@ public class MovieService
                 return await GetMoviesAsync("popular", page, genreId);
             }
 
-            var url = $"https://api.themoviedb.org/3/search/movie?api_key={ApiKey}&query={Uri.EscapeDataString(search)}&page={page}";
+            var url = $"https://api.themoviedb.org/3/search/movie?api_key={ApiKey}&query={Uri.EscapeDataString(search)}&page={page}&include_adult=false";
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
@@ -73,7 +75,9 @@ public class MovieService
 
             var result = await response.Content.ReadFromJsonAsync<TmdbResponse>();
 
-            var items = result?.Results ?? new();
+            var items = result?.Results?
+                .Where(m => !m.Adult)
+                .ToList() ?? new();
 
             if (genreId.HasValue)
             {
