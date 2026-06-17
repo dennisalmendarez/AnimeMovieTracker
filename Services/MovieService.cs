@@ -9,6 +9,34 @@ public class MovieService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
 
+    private static readonly HashSet<string> BlockedKeywordNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "softcore",
+        "pink film",
+        "erotic movie",
+        "pornography",
+        "adult film",
+        "bdsm",
+        "bondage",
+        "sadomasochism",
+        "masochism",
+        "sexual pleasure",
+        "sexually aggressive woman",
+        "nymphomaniac",
+        "masturbation"
+    };
+
+    private static readonly string[] StrongBlockedText =
+    {
+        "porn",
+        "xxx",
+        "softcore",
+        "hardcore",
+        "adult film",
+        "pink film",
+        "erotic movie"
+    };
+
     public MovieService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
@@ -21,15 +49,31 @@ public class MovieService
     {
         try
         {
-            string url;
+            var sortBy = category == "top_rated"
+                ? "vote_average.desc"
+                : "popularity.desc";
+
+            var url =
+                $"https://api.themoviedb.org/3/discover/movie" +
+                $"?api_key={ApiKey}" +
+                $"&page={page}" +
+                $"&sort_by={sortBy}" +
+                $"&include_adult=false" +
+                $"&include_video=false" +
+                $"&language=en-US" +
+                $"&region=US" +
+                $"&certification_country=US" +
+                $"&certification.lte=R" +
+                $"&vote_count.gte=50";
+
+            if (category == "top_rated")
+            {
+                url += "&vote_average.gte=6";
+            }
 
             if (genreId.HasValue)
             {
-                url = $"https://api.themoviedb.org/3/discover/movie?api_key={ApiKey}&page={page}&with_genres={genreId.Value}&sort_by=popularity.desc&include_adult=false";
-            }
-            else
-            {
-                url = $"https://api.themoviedb.org/3/movie/{category}?api_key={ApiKey}&page={page}&include_adult=false";
+                url += $"&with_genres={genreId.Value}";
             }
 
             var response = await _httpClient.GetAsync(url);
@@ -43,9 +87,7 @@ public class MovieService
 
             return new TmdbMoviePageResult
             {
-                Items = result?.Results?
-                    .Where(m => !m.Adult)
-                    .ToList() ?? new(),
+                Items = await FilterSafeMoviesAsync(result?.Results),
                 CurrentPage = result?.Page ?? page,
                 TotalPages = result?.TotalPages ?? 1
             };
@@ -65,7 +107,14 @@ public class MovieService
                 return await GetMoviesAsync("popular", page, genreId);
             }
 
-            var url = $"https://api.themoviedb.org/3/search/movie?api_key={ApiKey}&query={Uri.EscapeDataString(search)}&page={page}&include_adult=false";
+            var url =
+                $"https://api.themoviedb.org/3/search/movie" +
+                $"?api_key={ApiKey}" +
+                $"&query={Uri.EscapeDataString(search)}" +
+                $"&page={page}" +
+                $"&include_adult=false" +
+                $"&language=en-US";
+
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
@@ -75,9 +124,7 @@ public class MovieService
 
             var result = await response.Content.ReadFromJsonAsync<TmdbResponse>();
 
-            var items = result?.Results?
-                .Where(m => !m.Adult)
-                .ToList() ?? new();
+            var items = await FilterSafeMoviesAsync(result?.Results);
 
             if (genreId.HasValue)
             {
@@ -140,23 +187,99 @@ public class MovieService
             return new List<TmdbCastMember>();
         }
     }
+
     public async Task<TmdbMovie?> GetRandomMovieAsync()
     {
         try
         {
-            var randomPage = Random.Shared.Next(1, 500);
-            var result = await GetMoviesAsync("popular", randomPage);
-
-            if (result.Items.Count == 0)
+            for (var attempt = 0; attempt < 15; attempt++)
             {
-                return null;
+                var randomPage = Random.Shared.Next(1, 150);
+                var result = await GetMoviesAsync("popular", randomPage);
+
+                if (result.Items.Count > 0)
+                {
+                    return result.Items[Random.Shared.Next(result.Items.Count)];
+                }
             }
 
-            return result.Items[Random.Shared.Next(result.Items.Count)];
+            return null;
         }
         catch
         {
             return null;
+        }
+    }
+
+    private async Task<List<TmdbMovie>> FilterSafeMoviesAsync(List<TmdbMovie>? movies)
+    {
+        if (movies is null)
+        {
+            return new List<TmdbMovie>();
+        }
+
+        var safeMovies = new List<TmdbMovie>();
+
+        foreach (var movie in movies)
+        {
+            if (movie.Adult)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(movie.Title) || string.IsNullOrWhiteSpace(movie.PosterPath))
+            {
+                continue;
+            }
+
+            if (movie.VoteCount < 25)
+            {
+                continue;
+            }
+
+            if (HasStrongBlockedText(movie))
+            {
+                continue;
+            }
+
+            if (await HasBlockedKeywordsAsync(movie.Id))
+            {
+                continue;
+            }
+
+            safeMovies.Add(movie);
+        }
+
+        return safeMovies;
+    }
+
+    private static bool HasStrongBlockedText(TmdbMovie movie)
+    {
+        var text = $"{movie.Title} {movie.OriginalTitle} {movie.Overview}".ToLowerInvariant();
+
+        return StrongBlockedText.Any(blocked =>
+            text.Contains(blocked, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<bool> HasBlockedKeywordsAsync(int movieId)
+    {
+        try
+        {
+            var url = $"https://api.themoviedb.org/3/movie/{movieId}/keywords?api_key={ApiKey}";
+            var response = await _httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return false;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<TmdbKeywordResponse>();
+
+            return result?.Keywords.Any(k => BlockedKeywordNames.Contains(k.Name)) ?? false;
+        }
+        catch
+        {
+            return false;
         }
     }
 }
@@ -210,6 +333,21 @@ public class TmdbGenreResponse
 }
 
 public class TmdbGenre
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+}
+
+public class TmdbKeywordResponse
+{
+    [JsonPropertyName("keywords")]
+    public List<TmdbKeyword> Keywords { get; set; } = new();
+}
+
+public class TmdbKeyword
 {
     [JsonPropertyName("id")]
     public int Id { get; set; }

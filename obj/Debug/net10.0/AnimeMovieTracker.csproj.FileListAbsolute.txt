@@ -143,7 +143,6 @@ C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\scopedcss\Components\Layout\ReconnectModal.razor.rz.scp.css
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\scopedcss\bundle\AnimeMovieTracker.styles.css
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\scopedcss\projectbundle\AnimeMovieTracker.bundle.scp.css
-C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\compressed\kphbcod72e-{0}-f6fqfaujm5-f6fqfaujm5.gz
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\compressed\1d5xq4rv6r-{0}-bqjiyaj88i-bqjiyaj88i.gz
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\compressed\hqcta7s994-{0}-c2jlpeoesf-c2jlpeoesf.gz
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\compressed\dbdb8otdpw-{0}-erw9l3u2r3-erw9l3u2r3.gz
@@ -204,3 +203,4 @@ C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\AnimeMovieTracker.pdb
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\AnimeMovieTracker.genruntimeconfig.cache
 C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\ref\AnimeMovieTracker.dll
+C:\Users\Denni\Documents\BYU 2026\Netsofwareproject\AnimeMovieTracker\obj\Debug\net10.0\compressed\kphbcod72e-{0}-90ehwwwvdc-90ehwwwvdc.gz
